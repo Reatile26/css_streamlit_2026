@@ -1,9 +1,8 @@
-import os
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 
-
-# Optional PDF text extraction
+# Optional: PDF text extraction (only for previews)
 try:
     import PyPDF2
 except Exception:
@@ -11,25 +10,26 @@ except Exception:
 
 
 # =========================
-# PATHS (robust + based on file location)
+# Robust Paths (work locally + on Streamlit Cloud)
 # =========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent
+ASSETS = BASE_DIR / "assets"
 
-PROFILE_PHOTO = os.path.join(BASE_DIR, "Reatile Prof Photo - Copy (1).jpg")
-DEV_ECON_PDF  = os.path.join(BASE_DIR, "EDEV ESSAY ASSIGNMENT.pdf")
-INT_ECON_PDF  = os.path.join(BASE_DIR, "Reatile Seekoei - 2021109463.pdf")
-EOY_PDF       = os.path.join(BASE_DIR, "ReatileSeekoei_EoY_Oct2025.pdf")
+PROFILE_PHOTO = ASSETS / "profile.jpg"
+DEV_ECON_PDF  = ASSETS / "dev_econ.pdf"
+INT_ECON_PDF  = ASSETS / "int_econ.pdf"
+EOY_PDF       = ASSETS / "eoy.pdf"
 
 
 # =========================
-# HELPERS
+# Helpers
 # =========================
-def exists(path: str) -> bool:
-    return isinstance(path, str) and os.path.exists(path)
+def exists(path: Path) -> bool:
+    return path is not None and path.exists()
 
-def download_button(label: str, path: str, file_name: str, mime: str):
+def download_button(label: str, path: Path, file_name: str, mime: str):
     if not exists(path):
-        st.warning(f"Missing file: {os.path.basename(path)} (check it’s in the same folder as run_streamlit.py)")
+        st.warning(f"Missing file: {path.name}. Check it exists inside the assets/ folder in GitHub.")
         return
 
     with open(path, "rb") as f:
@@ -42,11 +42,9 @@ def download_button(label: str, path: str, file_name: str, mime: str):
         )
 
 @st.cache_data(show_spinner=False)
-def extract_pdf_text(path: str, max_chars: int = 12000) -> str:
+def extract_pdf_text(path: Path, max_chars: int = 12000) -> str:
     """Extract text from a PDF (best-effort)."""
-    if not exists(path):
-        return ""
-    if PyPDF2 is None:
+    if not exists(path) or PyPDF2 is None:
         return ""
 
     try:
@@ -62,18 +60,13 @@ def extract_pdf_text(path: str, max_chars: int = 12000) -> str:
     except Exception:
         return ""
 
-def section_header(title: str, subtitle: str = ""):
-    st.title(title)
-    if subtitle:
-        st.caption(subtitle)
-
 def bullet_list(items):
     for x in items:
         st.write(f"• {x}")
 
 
 # =========================
-# MAIN APP
+# Main App
 # =========================
 def main():
     st.set_page_config(
@@ -88,54 +81,59 @@ def main():
         ["Profile", "Writing & Research", "Economist of the Year", "Economics & Data Explorer", "Contact"]
     )
 
-    
+    st.sidebar.markdown("---")
+    st.sidebar.caption("Deployed via GitHub + Streamlit Cloud")
 
     # =========================
-    # PROFILE
+    # Profile
     # =========================
     if menu == "Profile":
         col1, col2 = st.columns([1, 2], gap="large")
 
         with col1:
-            section_header("Reatile Seekoei", "BComHons Business Analytics• University of the Free State")
+            st.title("Reatile Seekoei")
+            st.caption("BComHons Business Analytics • University of the Free State")
 
             if exists(PROFILE_PHOTO):
                 st.image(PROFILE_PHOTO, caption="Profile Photo", use_container_width=True)
             else:
-                st.info("Profile photo not found. Ensure it is in the same folder and the filename matches exactly.")
+                st.info(
+                    "Profile photo not found. Ensure you have assets/profile.jpg in your GitHub repo "
+                    "and that the filename matches exactly."
+                )
 
         with col2:
             st.header("About Me")
             st.write(
-                "I am a driven finance student with an open-minded approach to learning. I’m pursuing a career in finance to deepen my understanding and strengthen my financial acumen. I’m also keenly interested in coding and data analysis, which complement my analytical mindset and problem-solving approach. I strive to make a meaningful impact wherever I go — as a problem solver, an innovator, and someone who adds measurable value."
+                "I am a student with a strong interest in economics, development challenges, and "
+                "data-driven analysis. I enjoy turning complex theory into clear insight through writing, "
+                "presentations, and interactive tools."
             )
 
             st.subheader("Focus Areas")
             bullet_list([
                 "Development economics (environment–development nexus, sustainability, inequality)",
                 "International economics (technology, trade, productivity, labour market shifts)",
-                "Macroeconomic reasoning & forecasting frameworks (policy signals + data)",
-                "Data storytelling and clean visual analysis",
+                "Macroeconomic reasoning & forecasting frameworks",
+                "Data storytelling and dashboard-style reporting",
             ])
 
-
-            st.subheader("Quick Links")
+            st.subheader("Links")
             st.text_input("Email", value="reatileseekoei@gmail.com")
             st.text_input("LinkedIn", value="https://www.linkedin.com/in/reatile-seekoei-6252b6228/")
             st.text_input("GitHub", value="https://github.com/Reatile26")
 
     # =========================
-    # WRITING & RESEARCH
+    # Writing & Research
     # =========================
     elif menu == "Writing & Research":
-        section_header("Writing & Research", "Your essays, key themes, and downloadable files")
+        st.title("Writing & Research")
+        st.caption("Your essays with summaries + download links")
 
         tab1, tab2 = st.tabs(["Development Economics Essay", "International Economics Essay"])
 
         with tab1:
             st.subheader("Development Economics Essay")
-            
-
             bullet_list([
                 "Explores development challenges in Sub-Saharan Africa through an environment–development lens.",
                 "Discusses sustainability, inequality, and the balance between growth and ecological limits.",
@@ -150,23 +148,19 @@ def main():
             )
 
             if PyPDF2 is None:
-                st.info("Install PyPDF2 for text preview: pip install PyPDF2")
+                st.info("Install PyPDF2 for text preview: pip install PyPDF2 (and add it to requirements.txt)")
             else:
                 preview = extract_pdf_text(DEV_ECON_PDF)
                 if preview:
                     with st.expander("Preview extracted text (best-effort)"):
                         st.write(preview)
-                else:
-                    st.info("No preview extracted (some PDFs don’t allow clean text extraction).")
 
         with tab2:
             st.subheader("International Economics Essay")
-            
-
             bullet_list([
                 "Examines how technological innovation reshapes global trade and productivity.",
-                "Considers labour market implications (skills, displacement, job restructuring).",
-                "Highlights policy emphasis on inclusion and narrowing digital divides.",
+                "Considers labour market impacts: skills, displacement, job restructuring.",
+                "Highlights the need for inclusion and narrowing digital divides.",
             ])
 
             download_button(
@@ -177,28 +171,25 @@ def main():
             )
 
             if PyPDF2 is None:
-                st.info("Install PyPDF2 for text preview: pip install PyPDF2")
+                st.info("Install PyPDF2 for text preview: pip install PyPDF2 (and add it to requirements.txt)")
             else:
                 preview = extract_pdf_text(INT_ECON_PDF)
                 if preview:
                     with st.expander("Preview extracted text (best-effort)"):
                         st.write(preview)
-                else:
-                    st.info("No preview extracted (some PDFs don’t allow clean text extraction).")
 
     # =========================
-    # ECONOMIST OF THE YEAR
+    # Economist of the Year
     # =========================
     elif menu == "Economist of the Year":
-        section_header("Economist of the Year (EOY)")
+        st.title("Economist of the Year (EOY)")
+        st.caption("Competitive forecasting and macroeconomic reasoning")
 
         st.subheader("EOY Presentation")
-        st.caption("File: ReatileSeekoei_EoY_Oct2025.pdf")
-
         bullet_list([
             "Demonstrates a structured forecasting approach grounded in data and policy signals.",
             "Highlights key macro indicators and disciplined reasoning under uncertainty.",
-            "Reflects growth in economic interpretation, communication, and presentation skills.",
+            "Reflects growth in economic interpretation and communication.",
         ])
 
         download_button(
@@ -208,28 +199,23 @@ def main():
             "application/pdf",
         )
 
-        st.markdown("### Key takeaways (edit these to match your exact message)")
+        st.markdown("### Key takeaways (editable)")
         st.text_area(
-            "What do you want people to remember?",
+            "What do you want viewers to remember?",
             value=(
-                "• I built a structured forecasting framework that combines data trends with policy/market signals.\n"
-                "• I learned to communicate uncertainty clearly and justify forecasts with evidence.\n"
-                "• I improved my macroeconomic thinking and presentation ability under pressure."
+                "• I built a structured forecasting framework combining data trends with policy/market signals.\n"
+                "• I communicate uncertainty clearly and justify forecasts with evidence.\n"
+                "• I improved my macroeconomic interpretation and presentation ability."
             ),
-            height=150,
+            height=140,
         )
 
-        if PyPDF2 is not None:
-            preview = extract_pdf_text(EOY_PDF)
-            if preview:
-                with st.expander("Preview extracted text (best-effort)"):
-                    st.write(preview)
-
     # =========================
-    # ECONOMICS & DATA EXPLORER
+    # Economics & Data Explorer
     # =========================
     elif menu == "Economics & Data Explorer":
-        section_header("Economics & Data Explorer", "Upload a CSV and explore it (filters + quick charts)")
+        st.title("Economics & Data Explorer")
+        st.caption("Upload a CSV and explore it with filters + quick charts")
 
         uploaded = st.file_uploader("Upload a CSV dataset", type=["csv"])
 
@@ -243,26 +229,16 @@ def main():
             st.success(f"Loaded {df.shape[0]:,} rows × {df.shape[1]:,} columns")
             st.dataframe(df, use_container_width=True)
 
-            st.markdown("### Quick stats")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Rows", f"{df.shape[0]:,}")
-            with c2:
-                st.metric("Columns", f"{df.shape[1]:,}")
-            with c3:
-                st.metric("Missing values", f"{int(df.isna().sum().sum()):,}")
-
             st.markdown("### Filter")
             col = st.selectbox("Choose a column to filter", df.columns.tolist())
 
             if pd.api.types.is_numeric_dtype(df[col]):
-                min_v = float(df[col].min())
-                max_v = float(df[col].max())
-                lo, hi = st.slider("Range", min_v, max_v, (min_v, max_v))
+                lo, hi = st.slider("Select range", float(df[col].min()), float(df[col].max()),
+                                   (float(df[col].min()), float(df[col].max())))
                 filtered = df[df[col].between(lo, hi)]
             else:
-                unique_vals = sorted(df[col].dropna().astype(str).unique().tolist())
-                picks = st.multiselect("Select values", unique_vals, default=unique_vals[: min(6, len(unique_vals))])
+                vals = sorted(df[col].dropna().astype(str).unique().tolist())
+                picks = st.multiselect("Select values", vals, default=vals[: min(6, len(vals))])
                 filtered = df[df[col].astype(str).isin(picks)] if picks else df
 
             st.write("### Filtered data")
@@ -271,36 +247,34 @@ def main():
             st.markdown("### Quick chart")
             numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
             if numeric_cols:
-                chart_col = st.selectbox("Select numeric column", numeric_cols)
+                chart_col = st.selectbox("Choose numeric column", numeric_cols)
                 st.line_chart(filtered[chart_col])
             else:
                 st.info("No numeric columns found for charting.")
         else:
-            st.info("Upload any CSV (e.g., inflation, GDP, exchange rates, stock returns) to explore it here.")
+            st.info("Upload any CSV (inflation, GDP, exchange rates, returns) to explore it here.")
 
     # =========================
-    # CONTACT
+    # Contact
     # =========================
     elif menu == "Contact":
-        section_header("Contact", "Professional contact section")
-
-    
+        st.title("Contact")
+        st.caption("Professional contact section")
 
         st.text_input("Email", value="reatileseekoei@gmail.com")
         st.text_input("LinkedIn", value="https://www.linkedin.com/in/reatile-seekoei-6252b6228/")
 
-        st.markdown("### Message (demo)")
+        st.markdown("### Message ")
         with st.form("contact_form"):
-            name = st.text_input("Your name")
+            sender = st.text_input("Your name")
             message = st.text_area("Message", height=140)
             submitted = st.form_submit_button("Submit")
 
         if submitted:
             st.success("Message captured (demo).")
-            st.write("**From:**", name)
+            st.write("**From:**", sender)
             st.write("**Message:**", message)
 
 
-# Allows running directly: streamlit run app_profiler_menus.py
 if __name__ == "__main__":
     main()
